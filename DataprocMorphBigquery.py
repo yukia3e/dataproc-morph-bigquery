@@ -4,6 +4,9 @@ from google.cloud import storage
 from datetime import datetime as dt
 import MeCab
 import copy
+import jaconv
+import pandas as pd
+
 
 """
 =====================
@@ -16,7 +19,9 @@ Tokenizer UDF
 """
 class JapaneseTokenizer(object):
     def __init__(self):
-        self.mecab = MeCab.Tagger("-Ochasen -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd")
+        self.mecab = MeCab.Tagger(
+            '-d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd -u "/usr/lib/x86_64-linux-gnu/mecab/dic/user/neologd_60_noskip.dic"'
+        )
         self.mecab.parseToNode('')
  
     def split(self, text):
@@ -91,11 +96,22 @@ target_file_type = "{target_file_type}"
 bigquery_dataset = "{bigquery_dataset}"
 bigquery_save_table = "{bigquery_save_table}"
 
+try:
+    login = pd.read_csv(r'login.txt', header=None)
+    user = login[0][0]
+    password = login[0][1]
+    print('User information is ready!')
+except:
+    print('Login information is not available!!')
+
+host = '##.##.##.##'
+db_name = 'db_name'
+
 cloud_sql_options_base = {
-    "url":"jdbc:mysql://127.0.01:5432/{SCHEMA}",
+    "url": "jdbc:mysql://{}:5432/{}".format(host, db_name),
     "driver":"com.mysql.jdbc.Driver",
-    "user":"{DBUSER}",
-    "password":"{DBPASSWORD}"
+    "user":user,
+    "password":password
 }
 
 
@@ -153,7 +169,7 @@ for post_id in post_ids:
     
 for row in post_rows:
     id = str(row[0])
-    keyword = str(row[1].encode("UTF-8").lower())
+    keyword = str(jaconv.h2z(row[1]).encode("UTF-8").lower())
     post_dics_dics[id].append(keyword)
 
 
@@ -163,7 +179,7 @@ check_having_the_post_dics_keyword
 def check_having_the_post_dics_keyword(post_id, wakati):
     if post_id in post_dics_dics:
         wakati_array = wakati.split(",")
-        hit_words = [hit_word for hit_word in wakati_array if hit_word.encode("UTF-8").lower() in post_dics_dics[post_id]]
+        hit_words = [hit_word for hit_word in wakati_array if jaconv.h2z(hit_word).encode("UTF-8").lower() in post_dics_dics[post_id]]
         if any(hit_words):
             return ",".join(list(set(hit_words)))
         else:
